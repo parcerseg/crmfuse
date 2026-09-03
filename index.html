@@ -1603,6 +1603,7 @@ async function persistIndicacoes(){
   catch(e){ console.error('storage error', e); }
 }
 
+let LANDING_SYNC_TIMER = null;
 async function syncLandingPageLeads(){
   try{
     const res=await fetch(`${SUPABASE_URL}/rest/v1/${LANDING_LEADS_TABLE}?select=*&order=created_at.asc`,{headers:supabaseHeaders()});
@@ -1610,6 +1611,7 @@ async function syncLandingPageLeads(){
     if(!res.ok) throw new Error('Falha ao sincronizar leads: '+res.status);
     const rows=await res.json();
     let changed=false;
+    let imported=0;
     rows.forEach(row=>{
       const sourceId=String(row.id||row.lead_id||'');
       if(!sourceId || DB.clients.some(c=>c.sourceLeadId===sourceId)) return;
@@ -1630,10 +1632,22 @@ async function syncLandingPageLeads(){
         policyNumber:row.summary||row.resumo||'Importado automaticamente da landing page.',
         history:[{date:created,text:'Lead recebido automaticamente pela landing page.'}]
       });
-      DB.clients.unshift(lead); changed=true;
+      DB.clients.unshift(lead); changed=true; imported+=1;
     });
     if(changed) await persist();
-  }catch(e){ console.warn(e.message||e); }
+    return imported;
+  }catch(e){ console.warn(e.message||e); return 0; }
+}
+function startLandingLeadSync(){
+  if(LANDING_SYNC_TIMER) clearInterval(LANDING_SYNC_TIMER);
+  LANDING_SYNC_TIMER = setInterval(async ()=>{
+    if(!CURRENT_USER) return;
+    const imported = await syncLandingPageLeads();
+    if(!imported) return;
+    renderNav();
+    if(['inicio','dash','kanban','clientes'].includes(CURRENT_VIEW)) renderCurrentView();
+    toast(imported===1 ? 'Novo lead recebido pela landing page' : `${imported} novos leads recebidos pela landing page`);
+  }, 15000);
 }
 
 /* =========================================================
@@ -1893,6 +1907,7 @@ function enterApp(){
   loadFooterNote();
   loadHiddenStages();
   loadUserQuickAccess();
+  startLandingLeadSync();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+CURRENT_VIEW).classList.add('active');
   renderCurrentView();
