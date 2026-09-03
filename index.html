@@ -520,6 +520,20 @@ input,select,textarea{font-family:inherit;}
 .field textarea{resize:vertical;min-height:70px;font-family:inherit;}
 .field input.field-error{border-color:var(--danger);background:var(--danger-light);animation:fieldShake .35s;}
 @keyframes fieldShake{ 10%,90%{transform:translateX(-1px);} 20%,80%{transform:translateX(2px);} 30%,50%,70%{transform:translateX(-4px);} 40%,60%{transform:translateX(4px);} }
+.lead-data-panel{border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;}
+.lead-data-panel summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;cursor:pointer;color:var(--navy);font-size:12px;font-weight:800;background:var(--bg);list-style:none;}
+.lead-data-panel summary::-webkit-details-marker{display:none;}
+.lead-data-panel summary:after{content:'+';font-size:19px;font-weight:500;color:var(--blue);}
+.lead-data-panel[open] summary:after{content:'−';}
+.lead-data-panel-content{padding:16px;}
+.lead-member-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;}
+.lead-member-chip{display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--text-muted);font-size:11.5px;font-weight:700;}
+.lead-member-chip.selected{border-color:var(--blue);background:var(--sky-tint);color:var(--blue);}
+.lead-member-avatar{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:9px;font-weight:800;}
+.comment-list{display:flex;flex-direction:column;gap:9px;margin-top:16px;}
+.comment-item{padding:11px 13px;border:1px solid var(--border);border-radius:11px;background:var(--bg);}
+.comment-meta{display:flex;justify-content:space-between;gap:10px;color:var(--text-faint);font-size:10px;font-weight:700;}
+.comment-text{margin-top:6px;color:var(--text);font-size:12.5px;line-height:1.5;white-space:pre-wrap;}
 
 .wpp-block{background:var(--success-light);border:1px solid #bfe9d4;border-radius:var(--radius-md);padding:14px;margin-bottom:16px;}
 .wpp-block-top{display:flex;align-items:center;justify-content:between;gap:10px;margin-bottom:10px;}
@@ -1363,6 +1377,7 @@ function fmtDate(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); retu
 function fmtMoney(v){ return (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}); }
 function daysUntil(iso){ const d1=new Date(todayISO()); const d2=new Date(iso); return Math.round((d2-d1)/86400000); }
 function initials(name){ return name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
+function escapeHTML(value){ return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch])); }
 function stageOf(id){ return STAGES.find(s=>s.id===id); }
 
 function seedClients(groups){
@@ -1595,8 +1610,8 @@ async function persistGroups(){
   catch(e){ console.error('storage error', e); }
 }
 async function persistUsers(){
-  try{ await window.storage.set('crm:users', JSON.stringify(DB.users), true); }
-  catch(e){ console.error('storage error', e); }
+  try{ await window.storage.set('crm:users', JSON.stringify(DB.users), true); return true; }
+  catch(e){ console.error('storage error', e); return false; }
 }
 async function persistIndicacoes(){
   try{ await window.storage.set('crm:indicacoes', JSON.stringify(DB.indicacoes), true); }
@@ -1614,7 +1629,19 @@ async function syncLandingPageLeads(){
     let imported=0;
     rows.forEach(row=>{
       const sourceId=String(row.id||row.lead_id||'');
-      if(!sourceId || DB.clients.some(c=>c.sourceLeadId===sourceId)) return;
+      if(!sourceId) return;
+      const qualification=row.qualification||row.qualificacao||{};
+      const consultantMessage=String(qualification.consultant_message||qualification.mensagem_consultor||'').trim().slice(0,800);
+      const existing=DB.clients.find(c=>c.sourceLeadId===sourceId);
+      if(existing){
+        if(consultantMessage && existing.consultantMessage!==consultantMessage){
+          existing.consultantMessage=consultantMessage;
+          existing.history=existing.history||[];
+          existing.history.unshift({date:todayISO(),text:'O corretor deixou uma mensagem pelo formulário da landing page.'});
+          changed=true;
+        }
+        return;
+      }
       const answers=row.answers||row.respostas||{};
       const solution=String(row.solution||row.solucao||row.recommended_solution||answers.solucao||'').toLowerCase();
       const plan=solution.includes('gest')?'Gestão':solution.includes('expans')?'Expansão':'A definir';
@@ -1628,6 +1655,7 @@ async function syncLandingPageLeads(){
         phone:row.phone||row.telefone||answers.telefone||'',
         whatsapp:String(row.whatsapp||row.phone||row.telefone||answers.whatsapp||answers.telefone||'').replace(/\D/g,''),
         profession:row.profession||row.profissao||answers.profissao||'',
+        consultantMessage:consultantMessage,
         leadOrigin:'Landing Page', product:plan, stage:'lead', createdAt:created,
         policyNumber:row.summary||row.resumo||'Importado automaticamente da landing page.',
         history:[{date:created,text:'Lead recebido automaticamente pela landing page.'}]
@@ -1906,6 +1934,7 @@ function enterApp(){
   renderBanners();
   loadFooterNote();
   loadHiddenStages();
+  loadMeetingSettings();
   loadUserQuickAccess();
   startLandingLeadSync();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -2177,7 +2206,7 @@ const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','
 function blankClient(){
   return { id:uid('cli'), groupId:null, name:'', personType:'fisica', cpfCnpj:'', maritalStatus:'', phone:'', whatsapp:'', email:'', secondaryEmail:'', birthDate:'', profession:'', cep:'', addressStreet:'', addressNumber:'', addressComplement:'', neighborhood:'', city:'', state:'', clientStatus:'ativo',
     leadOrigin:LEAD_ORIGINS[0], owner:'', insurer:'', product:PRODUCTS[0], policyNumber:'', premium:0,
-    effectiveDate:'', renewalDate:'', closedDate:'', stage:'lead', history:[], attachments:[], createdAt:todayISO() };
+    effectiveDate:'', renewalDate:'', closedDate:'', stage:'lead', memberIds:[], comments:[], history:[], attachments:[], createdAt:todayISO() };
 }
 
 function renderClientModal(){
@@ -2186,6 +2215,7 @@ function renderClientModal(){
   const tabs = [
     {id:'dados', label:'Dados do Lead'},
     {id:'seguro', label:'Oportunidade'},
+    ...(isNew?[]:[{id:'comentarios', label:'Comentários'}]),
     {id:'historico', label:'Histórico'},
     {id:'anexos', label:'Anexos'},
   ];
@@ -2198,6 +2228,7 @@ function renderClientModal(){
           <div class="mh-name">${isNew?'Novo Lead':c.name}</div>
           <div class="mh-sub">${isNew?'Preencha os dados para adicionar ao funil':(stageOf(c.stage).name+' · Plano '+(c.product||'A definir'))}</div>
         </div>
+        ${!isNew ? `<button class="btn btn-sm" onclick="openMeetingForLead('${c.id}')">${ICONS.agenda} Agendar reunião</button>` : ''}
         ${!isNew ? `<button class="btn btn-wpp btn-sm" onclick="toggleWppPanel()">${ICONS.wpp} WhatsApp</button>` : ''}
         <button class="modal-close" onclick="closeModal()">${ICONS.close}</button>
       </div>
@@ -2208,6 +2239,9 @@ function renderClientModal(){
         <div id="wppPanelHolder"></div>
 
         <div class="tab-panel ${ACTIVE_TAB==='dados'?'active':''}">
+          <details class="lead-data-panel" open>
+            <summary>Dados cadastrais e etapa do lead</summary>
+            <div class="lead-data-panel-content">
           <div class="field full stage-picker-block ${isNew?'is-new':''}">
             <label>${isNew ? 'Em qual etapa do funil deseja adicionar esse lead?' : 'Etapa no Funil'}</label>
             <div class="stage-picker">
@@ -2257,6 +2291,8 @@ function renderClientModal(){
               </select>
             </div>
           </div>
+            </div>
+          </details>
         </div>
 
         <div class="tab-panel ${ACTIVE_TAB==='seguro'?'active':''}">
@@ -2264,7 +2300,25 @@ function renderClientModal(){
             ${selectField('Plano indicado','cf_product',PRODUCTS,c.product||PRODUCTS[0])}
             ${field('Valor da venda (R$)','cf_premium',c.premium,'number')}
             ${field('Próximo contato','cf_effective',c.effectiveDate,'date')}
-            <div class="field full"><label>Leitura comercial</label><textarea id="cf_policy" placeholder="Perfil do lead, necessidade identificada e próximos passos">${c.policyNumber||''}</textarea></div>
+            ${c.consultantMessage ? `<div class="field full"><label>Mensagem deixada para o consultor</label><div class="static-val" style="white-space:pre-wrap;line-height:1.55;">${escapeHTML(c.consultantMessage)}</div></div>` : ''}
+            <div class="field full"><label>Leitura comercial</label><textarea id="cf_policy" placeholder="Perfil do lead, necessidade identificada e próximos passos">${escapeHTML(c.policyNumber||'')}</textarea></div>
+          </div>
+        </div>
+
+        <div class="tab-panel ${ACTIVE_TAB==='comentarios'?'active':''}">
+          <div class="field full">
+            <label>Membros adicionados ao lead</label>
+            <div class="lead-member-list">
+              ${DB.users.filter(u=>u.active).map(u=>`<button type="button" class="lead-member-chip ${(c.memberIds||[]).includes(u.id)?'selected':''}" onclick="toggleLeadMember('${c.id}','${u.id}')"><span class="lead-member-avatar">${initials(u.name)}</span>${escapeHTML(u.name)}</button>`).join('')||'<span class="static-val">Nenhum usuário disponível.</span>'}
+            </div>
+          </div>
+          <div class="field full" style="margin-top:18px;">
+            <label>Novo comentário</label>
+            <textarea id="lead_comment" maxlength="1200" placeholder="Escreva uma atualização, observação ou marque o próximo passo..."></textarea>
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:9px;" onclick="addLeadComment('${c.id}')">${ICONS.plus} Adicionar comentário</button>
+          <div class="comment-list">
+            ${(c.comments||[]).length ? c.comments.map(item=>`<div class="comment-item"><div class="comment-meta"><span>${escapeHTML(item.authorName||'Equipe')}</span><span>${escapeHTML(item.createdAtLabel||fmtDate(item.date))}</span></div><div class="comment-text">${escapeHTML(item.text)}</div></div>`).join('') : '<div style="font-size:12px;color:var(--text-faint);">Nenhum comentário neste lead.</div>'}
           </div>
         </div>
 
@@ -2382,6 +2436,7 @@ function toggleWppPanel(){
         <strong style="font-size:13px;">Conversar no WhatsApp — ${c.name.split(' ')[0]}</strong>
       </div>
       <button class="btn btn-wpp btn-sm" onclick="sendWhatsApp('${c.id}', null)">${ICONS.wpp} Abrir conversa</button>
+      <button class="btn btn-sm" style="margin-left:6px;" onclick="sendMeetingLinkWhatsApp('${c.id}')">${ICONS.agenda} Enviar agenda</button>
       <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-top:12px;">Mensagens rápidas</div>
       <div class="wpp-quick">
         ${QUICK_MSGS.map(m=>`<button class="wpp-chip" onclick="sendWhatsApp('${c.id}','${m.id}')">${m.label}</button>`).join('')}
@@ -2399,6 +2454,36 @@ function addHistory(){
   persist();
   renderClientModal();
   toast('Observação adicionada ao histórico');
+}
+
+function toggleLeadMember(clientId,userId){
+  const c=DB.clients.find(x=>x.id===clientId);
+  const u=DB.users.find(x=>x.id===userId);
+  if(!c||!u) return;
+  c.memberIds=c.memberIds||[];
+  if(c.memberIds.includes(userId)){
+    c.memberIds=c.memberIds.filter(id=>id!==userId);
+    c.history=c.history||[];
+    c.history.unshift({date:todayISO(),text:`${u.name} foi removido(a) do lead.`});
+  }else{
+    c.memberIds.push(userId);
+    c.history=c.history||[];
+    c.history.unshift({date:todayISO(),text:`${u.name} foi adicionado(a) ao lead.`});
+  }
+  persist(); renderClientModal(); toast('Membros do lead atualizados');
+}
+
+function addLeadComment(clientId){
+  const c=DB.clients.find(x=>x.id===clientId);
+  const input=document.getElementById('lead_comment');
+  const text=String(input?.value||'').trim();
+  if(!c||!text){ toast('Escreva um comentário'); return; }
+  const now=new Date();
+  c.comments=c.comments||[];
+  c.comments.unshift({id:uid('com'),text:text.slice(0,1200),authorId:CURRENT_USER.id,authorName:CURRENT_USER.name,date:todayISO(),createdAt:now.toISOString(),createdAtLabel:now.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})});
+  c.history=c.history||[];
+  c.history.unshift({date:todayISO(),text:`${CURRENT_USER.name} adicionou um comentário.`});
+  persist(); renderClientModal(); toast('Comentário adicionado');
 }
 
 function simulateUpload(){
@@ -2599,7 +2684,7 @@ function getNavItems(){
   const isSuper = CURRENT_USER && isSuperAdmin();
   const isAdmin = CURRENT_USER && isAdminRole();
   const items = [];
-  items.push({id:'inicio', label:'Meus Acessos', icon:ICONS.home});
+  items.push({id:'inicio', label:'Início', icon:ICONS.home});
   if(isSuper || hasPerm('dash_ver')) items.push({id:'dash', label:'Dashboard', icon:ICONS.dash});
   if(isSuper || hasPerm('negocios_ver')) items.push({id:'kanban', label:'Funil de Vendas', icon:ICONS.kanban});
   if(isSuper || hasPerm('tarefas_ver')) items.push(
@@ -2751,7 +2836,7 @@ function switchView(id){
 }
 
 function renderTopbar(){
-  const titles = {inicio:'Meus Acessos', kanban:'Funil de Vendas', dash:'Dashboard Comercial', tasks:'Tarefas', clientes:'Leads', usuarios:'Usuários', permissoes:'Permissões', logs:'Logs'};
+  const titles = {inicio:'Início', kanban:'Funil de Vendas', dash:'Dashboard Comercial', tasks:'Tarefas', clientes:'Leads', usuarios:'Usuários', permissoes:'Permissões', logs:'Logs'};
   const tb = document.getElementById('topbar');
   const showSearch = ['kanban','indicacoes','renew','tasks'].includes(CURRENT_VIEW);
   tb.innerHTML = `
@@ -3847,6 +3932,49 @@ function pendenciasForCurrentUser(){
   if(CURRENT_USER.role==='corretor') return list.filter(p=>p.createdBy===CURRENT_USER.id);
   return list; // gestor vê todas as pendências da divisão
 }
+let MEETING_SETTINGS = {url:'', title:'Agenda Parcer'};
+async function loadMeetingSettings(){
+  try{
+    const result=await window.storage.get('crm:meetingSettings',true);
+    MEETING_SETTINGS=Object.assign({url:'',title:'Agenda Parcer'},JSON.parse(result.value)||{});
+  }catch(e){ MEETING_SETTINGS={url:'',title:'Agenda Parcer'}; }
+  if(CURRENT_VIEW==='inicio') renderPersonalHome();
+}
+function openMeetingSettingsModal(){
+  document.getElementById('modalOverlay').innerHTML=`<div class="modal modal-small">
+    <div class="modal-head"><div class="mh-info"><div class="mh-name">Agenda padrão de reuniões</div><div class="mh-sub">O mesmo link será usado em todos os leads</div></div><button class="modal-close" onclick="closeModal()">${ICONS.close}</button></div>
+    <div class="modal-body" style="padding:20px 22px;"><div class="field-grid">
+      ${field('Nome da agenda','meeting_title',MEETING_SETTINGS.title||'Agenda Parcer','text','full')}
+      ${field('Link público de agendamento','meeting_url',MEETING_SETTINGS.url||'','url','full')}
+      <div class="field full"><div class="static-val" style="font-weight:500;line-height:1.5;color:var(--text-muted);">Use o link público da agenda que mostra somente horários disponíveis. Ao configurar o evento no Google Agenda com videoconferência, cada reserva poderá gerar o Google Meet automaticamente.</div></div>
+    </div></div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveMeetingSettings()">Salvar agenda</button></div>
+  </div>`;
+  document.getElementById('modalOverlay').classList.add('active');
+}
+async function saveMeetingSettings(){
+  const title=document.getElementById('meeting_title').value.trim()||'Agenda Parcer';
+  const url=normalizeAccessUrl(document.getElementById('meeting_url').value);
+  if(!url){ toast('Informe um link de agendamento válido'); return; }
+  MEETING_SETTINGS={title,url};
+  await window.storage.set('crm:meetingSettings',JSON.stringify(MEETING_SETTINGS),true);
+  closeModal(); renderPersonalHome(); toast('Agenda padrão salva');
+}
+function openMeetingForLead(clientId){
+  const c=DB.clients.find(x=>x.id===clientId);
+  if(!MEETING_SETTINGS.url){ openMeetingSettingsModal(); toast('Configure primeiro o link padrão da agenda'); return; }
+  if(c){ c.history=c.history||[]; c.history.unshift({date:todayISO(),text:'Link de agendamento aberto para este lead.'}); persist(); }
+  window.open(MEETING_SETTINGS.url,'_blank','noopener');
+}
+function sendMeetingLinkWhatsApp(clientId){
+  const c=DB.clients.find(x=>x.id===clientId);
+  if(!c?.whatsapp){ toast('Cadastre o WhatsApp deste lead'); return; }
+  if(!MEETING_SETTINGS.url){ openMeetingSettingsModal(); toast('Configure primeiro o link padrão da agenda'); return; }
+  const firstName=(c.name||'').split(' ')[0]||'';
+  const text=`Olá ${firstName}, escolha o melhor horário disponível para nossa conversa: ${MEETING_SETTINGS.url}`;
+  window.open(`https://wa.me/${String(c.whatsapp).replace(/\D/g,'')}?text=${encodeURIComponent(text)}`,'_blank');
+}
+
 let USER_QUICK_ACCESS = [];
 function quickAccessStorageKey(){ return 'crm:quickAccess:'+(CURRENT_USER?.authId||CURRENT_USER?.id||'user'); }
 function safeText(value){ return String(value||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
@@ -3869,6 +3997,11 @@ async function saveUserQuickAccess(){
 function renderPersonalHome(){
   const root=document.getElementById('inicioRoot');
   if(!root) return;
+  const pendingTasks=tasksInScope().filter(t=>t.status!=='done').sort((a,b)=>String(a.dueDate||'9999').localeCompare(String(b.dueDate||'9999')));
+  const pendingLeads=clientsInScope().filter(c=>!['fechado','perdido'].includes(c.stage)).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const newLeads=pendingLeads.filter(c=>c.stage==='lead');
+  const meetingLeads=pendingLeads.filter(c=>c.stage==='reuniao');
+  const overdueTasks=pendingTasks.filter(t=>t.dueDate&&t.dueDate<todayISO());
   const cards=USER_QUICK_ACCESS.map(item=>`
     <div class="quick-access-card" style="--qa-color:${item.color||'#195AB4'};position:relative;min-height:112px;">
       <a href="${safeText(item.url)}" target="_blank" rel="noopener" style="position:absolute;inset:0;z-index:1;" aria-label="Abrir ${safeText(item.name)}"></a>
@@ -3883,7 +4016,33 @@ function renderPersonalHome(){
   root.innerHTML=`
     <div class="welcome-banner">
       <div class="welcome-greeting">${greetingByLocalTime()}, ${safeText(CURRENT_USER.name.split(' ')[0])}</div>
-      <div class="welcome-sub">Seus atalhos pessoais. Somente você vê e edita esta lista.</div>
+      <div class="welcome-sub">Veja o que precisa da sua atenção hoje e acesse rapidamente suas ferramentas.</div>
+    </div>
+    <div class="kpi-grid">
+      ${kpi('Tarefas pendentes',pendingTasks.length,overdueTasks.length?`${overdueTasks.length} atrasada(s)`:'nenhuma tarefa atrasada','var(--warning)','var(--warning-light)',ICONS.tasks)}
+      ${kpi('Leads pendentes',pendingLeads.length,'oportunidades em andamento','var(--blue)','var(--blue-light)',ICONS.clients)}
+      ${kpi('Novos leads',newLeads.length,'aguardando primeiro contato','var(--navy)','var(--sky-tint)',ICONS.flame)}
+      ${kpi('Reuniões',meetingLeads.length,'leads na etapa de reunião','var(--success)','var(--success-light)',ICONS.agenda)}
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Próximas tarefas <button class="btn btn-sm" onclick="switchView('tasks')">Ver todas</button></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${pendingTasks.slice(0,5).map(t=>{const client=DB.clients.find(c=>c.id===t.clientId);return `<button class="task-item" style="width:100%;text-align:left;cursor:pointer;" onclick="switchView('tasks')"><div class="task-title">${safeText(t.title)}</div><div class="task-client">${safeText(client?.name||'Sem lead vinculado')}</div><div class="task-foot"><span class="task-badge priority-${t.priority||'media'}">${safeText(t.priority||'média')}</span><span class="task-due">${t.dueDate?fmtDate(t.dueDate):'Sem prazo'}</span></div></button>`;}).join('')||'<div style="font-size:12px;color:var(--text-faint);">Tudo em dia. Nenhuma tarefa pendente.</div>'}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Leads que precisam de atenção <button class="btn btn-sm" onclick="switchView('kanban')">Abrir funil</button></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${pendingLeads.slice(0,5).map(c=>`<button class="task-item" style="width:100%;text-align:left;cursor:pointer;" onclick="openClientModal('${c.id}')"><div class="task-title">${safeText(c.name)}</div><div class="task-client">${safeText(c.product||'Plano a definir')}</div><div class="task-foot"><span class="task-badge" style="background:var(--blue-light);color:var(--blue);">${safeText(stageOf(c.stage)?.name||'Novo lead')}</span><span class="task-due">${c.createdAt?fmtDate(c.createdAt):''}</span></div></button>`).join('')||'<div style="font-size:12px;color:var(--text-faint);">Nenhum lead pendente no momento.</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:14px;">
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">Agenda de reuniões
+        <button class="btn btn-primary btn-sm" onclick="openMeetingSettingsModal()">${ICONS.agenda} ${MEETING_SETTINGS.url?'Editar agenda':'Configurar agenda'}</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.55;">${MEETING_SETTINGS.url?`Link padrão ativo: <a href="${safeText(MEETING_SETTINGS.url)}" target="_blank" rel="noopener">${safeText(MEETING_SETTINGS.title)}</a>. Ele será usado para todos os leads e futuramente pela IA do WhatsApp.`:'Cadastre o link público da sua agenda para que o lead veja somente os horários disponíveis.'}</div>
     </div>
     <div class="panel">
       <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">Meus acessos
@@ -8973,7 +9132,7 @@ function handleProfilePhoto(event){
   const reader = new FileReader();
   reader.onload = (e)=>{
     const img = new Image();
-    img.onload = ()=>{
+    img.onload = async ()=>{
       const canvas = document.createElement('canvas');
       const size = 200;
       canvas.width = size; canvas.height = size;
@@ -8981,16 +9140,27 @@ function handleProfilePhoto(event){
       const scale = Math.max(size/img.width, size/img.height);
       const w = img.width*scale, h = img.height*scale;
       ctx.drawImage(img, (size-w)/2, (size-h)/2, w, h);
-      CURRENT_USER.photo = canvas.toDataURL('image/jpeg', 0.85);
+      const photo = canvas.toDataURL('image/jpeg', 0.82);
+      const u = DB.users.find(x=>x.id===CURRENT_USER.id);
+      if(u) u.photo = photo;
+      CURRENT_USER.photo = photo;
+      const saved = await persistUsers();
       renderMyProfileModal();
+      renderSidebarFooter();
+      toast(saved ? 'Foto salva no perfil' : 'Não foi possível salvar a foto no banco');
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
-function removeProfilePhoto(){
+async function removeProfilePhoto(){
   CURRENT_USER.photo = '';
+  const u = DB.users.find(x=>x.id===CURRENT_USER.id);
+  if(u) u.photo = '';
+  const saved = await persistUsers();
   renderMyProfileModal();
+  renderSidebarFooter();
+  toast(saved ? 'Foto removida do perfil' : 'Não foi possível atualizar a foto no banco');
 }
 async function saveMyProfile(){
   const name = document.getElementById('pf_name').value.trim();
@@ -9001,7 +9171,8 @@ async function saveMyProfile(){
   u.name = name; u.email = email; u.photo = CURRENT_USER.photo || '';
   if(pass) u.password = pass;
   CURRENT_USER = u;
-  await persistUsers();
+  const saved = await persistUsers();
+  if(!saved){ toast('Não foi possível salvar o perfil no banco'); return; }
   closeModal();
   renderSidebarBrand();
   renderSidebarFooter();
