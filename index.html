@@ -95,7 +95,7 @@ input,select,textarea{font-family:inherit;}
   padding:4px 8px 22px 8px;
 }
 .brand-text{line-height:1.1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;}
-.brand-text .brand-logo-img{width:190px;max-width:100%;height:auto;display:block;}
+.brand-text .brand-logo-img{width:114px;max-width:100%;height:auto;display:block;}
 .brand-text .t2{font-size:10.5px;color:#B8CCEA;letter-spacing:.4px;text-transform:uppercase;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
 
 .nav{display:flex;flex-direction:column;gap:3px;margin-top:6px;}
@@ -1880,7 +1880,7 @@ async function sendPasswordRecovery(){
 function enterApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='flex';
-  CURRENT_VIEW = 'dash';
+  CURRENT_VIEW = 'inicio';
   pruneOldNotifications();
   applySidebarPref();
   renderSidebarBrand();
@@ -2582,19 +2582,25 @@ const ICONS = {
 
 function getNavItems(){
   const isSuper = CURRENT_USER && isSuperAdmin();
+  const isAdmin = CURRENT_USER && isAdminRole();
   const items = [];
+  items.push({id:'inicio', label:'Meus Acessos', icon:ICONS.home});
   if(isSuper || hasPerm('dash_ver')) items.push({id:'dash', label:'Dashboard', icon:ICONS.dash});
   if(isSuper || hasPerm('negocios_ver')) items.push({id:'kanban', label:'Funil de Vendas', icon:ICONS.kanban});
-  items.push({id:'inicio', label:'Meus Acessos', icon:ICONS.home});
   if(isSuper || hasPerm('tarefas_ver')) items.push(
     {id:'tasks',  label:'Tarefas',         icon:ICONS.tasks},
   );
   if(isSuper || hasPerm('negocios_ver')) items.push({id:'clientes', label:'Leads', icon:ICONS.clients});
+  if(isAdmin) items.push({id:'usuarios', label:'Usuários', icon:ICONS.clients});
+  if(isSuper) items.push({id:'permissoes', label:'Permissões', icon:ICONS.admin});
+  if(isSuper) items.push({id:'logs', label:'Logs', icon:ICONS.file});
   return items;
 }
 
-const NAV_GROUPS = {};
-const NAV_DISPLAY_ORDER = ['dash','kanban','inicio','tasks','clientes'];
+const NAV_GROUPS = {
+  administracao: {label:'Administração', icon:ICONS.admin, itemIds:['usuarios','permissoes','logs']},
+};
+const NAV_DISPLAY_ORDER = ['inicio','dash','kanban','tasks','clientes','administracao'];
 
 function navBadgeFor(itemId){
   if(itemId==='renew'){
@@ -2730,7 +2736,7 @@ function switchView(id){
 }
 
 function renderTopbar(){
-  const titles = {inicio:'Meus Acessos', kanban:'Funil de Vendas', dash:'Dashboard Comercial', tasks:'Tarefas', clientes:'Leads'};
+  const titles = {inicio:'Meus Acessos', kanban:'Funil de Vendas', dash:'Dashboard Comercial', tasks:'Tarefas', clientes:'Leads', usuarios:'Usuários', permissoes:'Permissões', logs:'Logs'};
   const tb = document.getElementById('topbar');
   const showSearch = ['kanban','indicacoes','renew','tasks'].includes(CURRENT_VIEW);
   tb.innerHTML = `
@@ -3088,7 +3094,7 @@ function cardHTML(c){
   }
   return `
     <div class="card" draggable="true" data-id="${c.id}" ondragstart="onCardDragStart(event,'${c.id}')" ondragend="this.classList.remove('dragging')" onclick="openClientModal('${c.id}')">
-      <button class="card-del-btn" title="Excluir cliente" onclick="event.stopPropagation(); requestDeleteClient('${c.id}')">${ICONS.trash}</button>
+      <button class="card-del-btn" title="Excluir lead" onclick="event.stopPropagation(); requestDeleteClient('${c.id}')">${ICONS.trash}</button>
       <div class="card-top">
         <span class="card-name">${c.name}</span>
         <span class="card-origin">${c.leadOrigin}</span>
@@ -3098,6 +3104,7 @@ function cardHTML(c){
         <span class="card-premium">${c.premium?fmtMoney(c.premium):'—'}</span>
         <span class="card-owner" title="${c.owner}">${initials(c.owner)}</span>
       </div>
+      ${c.whatsapp ? `<button class="btn btn-wpp btn-sm" style="width:100%;margin-top:9px;justify-content:center;" onclick="event.stopPropagation();sendWhatsApp('${c.id}',null)">${ICONS.wpp} WhatsApp</button>` : ''}
       ${flag}
     </div>
   `;
@@ -4267,12 +4274,13 @@ function openInsurersInfo(){
 
 function sendWhatsApp(clientId, quickId){
   const c = DB.clients.find(x=>x.id===clientId);
+  if(!c || !c.whatsapp){ toast('Cadastre o WhatsApp deste lead'); return; }
   let text = `Olá ${c.name.split(' ')[0]}, tudo bem?`;
   if(quickId){
     const q = QUICK_MSGS.find(m=>m.id===quickId);
     if(q) text = q.text.replace('{nome}', c.name.split(' ')[0]);
   }
-  const phone = c.whatsapp || '55';
+  const phone = String(c.whatsapp).replace(/\D/g,'');
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
 }
 
@@ -4280,7 +4288,7 @@ function sendWhatsApp(clientId, quickId){
    ADMINISTRAÇÃO — usuários, divisões, permissões, cobrança e comunicados
    (cada uma é uma sub-aba própria no menu lateral, dentro do grupo "Administração")
    ========================================================= */
-const ADMIN_VIEW_IDS = ['usuarios','corretoras','estrutura','permissoes','cobranca','comunicados','logs'];
+const ADMIN_VIEW_IDS = ['usuarios','permissoes','logs'];
 function renderAdminUsuarios(){
   if(!CURRENT_USER || !isAdminRole()) return;
   document.getElementById('usuariosRoot').innerHTML = adminUsersHTML();
