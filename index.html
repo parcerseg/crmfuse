@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#132728">
+<meta name="theme-color" content="#05132A">
 <title>FUSE</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -26,25 +26,24 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 :root{
-  /* Identidade FUSE — sistema em preto e branco; o degradê da marca
-     é usado só em destaques pontuais (login, logo, badges de prioridade) */
-  --navy:#0d0d0d;
-  --navy-800:#1a1a1a;
-  --navy-900:#000000;
-  --blue:#262626;
-  --blue-600:#000000;
-  --blue-light:#f2f2f2;
-  --sky:#e6e6e6;
-  --sky-tint:#f5f5f5;
-  --sky-deep:#333333;
-  --sky-deep-light:#737373;
-  --accent-gradient: linear-gradient(135deg, #fefefe 0%, #fbc15f 18%, #f56824 34%, #ae3378 50%, #601ef2 66%, #310c72 82%, #120123 100%);
-  --bg:#FFFFFF;
+  /* Identidade FUSE — paleta institucional inspirada no BTG Pactual */
+  --navy:#0B2859;
+  --navy-800:#10408D;
+  --navy-900:#05132A;
+  --blue:#195AB4;
+  --blue-600:#10408D;
+  --blue-light:#D2E5FF;
+  --sky:#549CFF;
+  --sky-tint:#EEF5FF;
+  --sky-deep:#307AE0;
+  --sky-deep-light:#87BAFF;
+  --accent-gradient:linear-gradient(135deg,#05132A 0%,#0B2859 28%,#195AB4 58%,#307AE0 80%,#549CFF 100%);
+  --bg:#F4F7FB;
   --surface:#FFFFFF;
   --surface-alt:#F6F8FA;
-  --border:#E4E9EF;
-  --text:#1B2733;
-  --text-muted:#64748B;
+  --border:#D8E3F2;
+  --text:#05132A;
+  --text-muted:#5B6B85;
   --text-faint:#94A3B8;
   --success:#12B76A;
   --success-light:#E7F9F1;
@@ -77,7 +76,7 @@ h1,h2,h3,h4,.font-display{font-family:'Poppins',system-ui,sans-serif;}
 button{font-family:inherit;cursor:pointer;}
 input,select,textarea{font-family:inherit;}
 ::-webkit-scrollbar{height:8px;width:8px;}
-::-webkit-scrollbar-thumb{background:#C7D2E3;border-radius:8px;}
+::-webkit-scrollbar-thumb{background:#B8CCEA;border-radius:8px;}
 ::-webkit-scrollbar-track{background:transparent;}
 
 #app{display:flex;height:100vh;width:100vw;}
@@ -98,13 +97,13 @@ input,select,textarea{font-family:inherit;}
 }
 .brand-text{line-height:1.1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;}
 .brand-text .brand-logo-img{height:16px;width:auto;display:block;filter:brightness(0) invert(1);}
-.brand-text .t2{font-size:10.5px;color:#9db4d6;letter-spacing:.4px;text-transform:uppercase;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+.brand-text .t2{font-size:10.5px;color:#B8CCEA;letter-spacing:.4px;text-transform:uppercase;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
 
 .nav{display:flex;flex-direction:column;gap:3px;margin-top:6px;}
 .nav-item{
   display:flex;align-items:center;gap:11px;
   padding:10px 12px;border-radius:10px;
-  color:#b9c8e0;font-size:13.5px;font-weight:600;
+  color:#D2E5FF;font-size:13.5px;font-weight:600;
   background:transparent;border:none;text-align:left;width:100%;
   transition:background .15s, color .15s;
 }
@@ -117,14 +116,14 @@ input,select,textarea{font-family:inherit;}
   padding:1px 6px;border-radius:20px;
 }
 .nav-section-label{
-  font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#5f7796;
+  font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#87BAFF;
   margin:16px 12px 4px;font-weight:700;
 }
 .nav-group{margin:2px 0;}
 .nav-group-label{
   display:flex;align-items:center;gap:11px;padding:10px 12px;width:100%;
   background:transparent;border:none;text-align:left;cursor:pointer;
-  color:#7891ac;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+  color:#B8CCEA;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
   border-radius:10px;transition:background .15s,color .15s;
 }
 .nav-group-label:hover{background:rgba(255,255,255,.06);}
@@ -160,7 +159,7 @@ input,select,textarea{font-family:inherit;}
 }
 .profile-avatar img{width:100%;height:100%;object-fit:cover;}
 .sidebar-footer .who{font-size:12.5px;font-weight:700;color:#fff;}
-.sidebar-footer .role{font-size:10.5px;color:#9db4d6;}
+.sidebar-footer .role{font-size:10.5px;color:#B8CCEA;}
 .sidebar{transition:width .22s var(--ease), min-width .22s var(--ease);cursor:default;}
 .sidebar.collapsed{width:74px;min-width:74px;}
 .sidebar.collapsed .brand{justify-content:center;padding:4px 0 22px;}
@@ -178,7 +177,7 @@ input,select,textarea{font-family:inherit;}
 .sidebar.collapsed .nav-group-children-inner{padding-left:0;border-left:none;margin-left:0;}
 .sidebar-powered{
   display:flex;align-items:center;gap:6px;padding:12px 8px 2px;margin-top:8px;
-  font-size:9.5px;color:#7891ac;font-weight:600;
+  font-size:9.5px;color:#B8CCEA;font-weight:600;
 }
 .sidebar-powered img{height:11px;width:auto;opacity:.8;filter:brightness(0) invert(1);}
 .sidebar-powered .sp-sep{opacity:.5;}
@@ -491,7 +490,7 @@ input,select,textarea{font-family:inherit;}
 }
 .modal-head .mh-info{flex:1;min-width:0;}
 .modal-head .mh-name{font-family:'Poppins';font-weight:800;font-size:16px;}
-.modal-head .mh-sub{font-size:11.5px;color:#b9c8e0;margin-top:2px;}
+.modal-head .mh-sub{font-size:11.5px;color:#B8CCEA;margin-top:2px;}
 .modal-close{
   width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.12);border:none;color:#fff;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
@@ -577,7 +576,7 @@ input,select,textarea{font-family:inherit;}
 /* ===== LOGIN ===== */
 #loginScreen{
   position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(circle at 20% 20%, #1a1a1a 0%, var(--navy-900) 55%, #000000 100%);
+  background:radial-gradient(circle at 20% 20%, #195AB4 0%, var(--navy-900) 58%, #001E62 100%);
   overflow:hidden;
 }
 #loginScreen::before{
@@ -1045,7 +1044,7 @@ const LOGO_WORDMARK = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA4QAAAFyCAY
 const STAGES = [
   {id:'lead',        name:'Lead Recebido',      color:'#94A3B8'},
   {id:'contato',      name:'Primeiro Contato',   color:'#60A5FA'},
-  {id:'cotacao',      name:'Em Cotação',         color:'#404040'},
+  {id:'cotacao',      name:'Em Cotação',         color:'#195AB4'},
   {id:'negociacao',   name:'Em Negociação',      color:'#8B5CF6'},
   {id:'aguardando',   name:'Aguardando Cliente', color:'#F79009'},
   {id:'proposta',     name:'Proposta Enviada',   color:'#8B6F3E'},
@@ -1062,7 +1061,7 @@ const LOCKED_STAGES = ['negociacao','fechado','perdido']; // colunas que nunca p
    ========================================================= */
 const IND_STAGES = [
   {id:'a_tratar',       name:'A Tratar',        color:'#12B76A'},
-  {id:'em_validacao',   name:'Em Validação',    color:'#404040'},
+  {id:'em_validacao',   name:'Em Validação',    color:'#195AB4'},
   {id:'em_negociacao',  name:'Em Negociação',   color:'#F79009'},
   {id:'fechado',        name:'Fechados',        color:'#12B76A'},
   {id:'perdido',        name:'Perdidos',        color:'#F04438'},
@@ -1846,7 +1845,7 @@ function renderSidebarFooter(){
       <div class="who">${CURRENT_USER.name}</div>
       <div class="role">${subLabel}</div>
     </div>
-    <button class="icon-btn sf-logout" title="Sair" onclick="logout()" style="width:28px;height:28px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:#b9c8e0;">
+    <button class="icon-btn sf-logout" title="Sair" onclick="logout()" style="width:28px;height:28px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:#D2E5FF;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
     </button>
   `;
@@ -3904,7 +3903,7 @@ function renderTasks(){
   const tasks = tasksInScope().slice().sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
   const cols = [
     {id:'todo', label:'A Fazer', color:'#94A3B8'},
-    {id:'doing', label:'Em Andamento', color:'#404040'},
+    {id:'doing', label:'Em Andamento', color:'#195AB4'},
     {id:'done', label:'Concluídas', color:'#12B76A'},
   ];
   document.getElementById('taskCols').innerHTML = cols.map(col=>{
